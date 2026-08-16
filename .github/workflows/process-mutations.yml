@@ -1,0 +1,74 @@
+name: Process kernel mutations
+
+on:
+  push:
+    paths:
+      - "mutations/*/*.json"
+      - "kernels/*/data/*.json"
+      - "scripts/process_mutations.py"
+      - "kernel.json"
+      - ".github/workflows/process-mutations.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kernel-mutations-main-v2
+  cancel-in-progress: false
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Process and commit kernel data
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          max_attempts=5
+
+          for attempt in $(seq 1 "${max_attempts}"); do
+              if [ "${attempt}" -gt 1 ]; then
+                  git fetch origin main
+                  git reset --hard origin/main
+              fi
+
+              python3 scripts/process_mutations.py
+
+              git add -A -- \
+                  kernel-state.json \
+                  kernels
+
+              if git ls-files --cached --others --exclude-standard mutations | grep -q .; then
+                  git add -A -- mutations
+              fi
+
+              if git diff --cached --quiet; then
+                  echo "No processed changes to commit."
+                  exit 0
+              fi
+
+              git commit -m "Process kernel mutations"
+
+              if git push origin HEAD:main; then
+                  exit 0
+              fi
+
+              if [ "${attempt}" -eq "${max_attempts}" ]; then
+                  echo "Unable to push processed kernel data after ${max_attempts} attempts." >&2
+                  exit 1
+              fi
+
+              echo "main advanced during processing; retrying against the latest origin/main."
+          done
