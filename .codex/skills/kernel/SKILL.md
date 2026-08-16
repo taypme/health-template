@@ -39,7 +39,7 @@ $kernel mutations
 
 Before changing repository state, read:
 
-- `README.md` for the current Health Kernel contract.
+- `INSTRUCTIONS.md` for the current Health Kernel contract.
 - `kernel.json` for registered kernels and command semantics.
 - `kernel-state.json` for committed row counts and filename arrays.
 
