@@ -1,6 +1,6 @@
 # Health Kernel Template
 
-Health Kernel is a GitHub-backed personal data kernel for ChatGPT conversations. It stores structured health-related rows as JSON files in a private GitHub repository, then uses `INSTRUCTIONS.md`, `kernel.json`, and `kernel-state.json` as the operating contract for reading, adding, updating, deleting, and pushing kernel data.
+Health Kernel is a GitHub-backed personal data kernel for ChatGPT conversations. It stores structured health-related rows as JSON files in a private GitHub repository, then uses `INSTRUCTIONS.md`, `kernel.json`, and `kernel-state.json` as the operating contract for reading, adding, updating, deleting, moving, and pushing kernel data.
 
 This repository is the vanilla template. It contains the kernel system, commands, mutation processor, and GitHub Actions workflow, but no personal health data.
 
@@ -57,6 +57,8 @@ $kernel rx data
 $kernel rx add sertraline 50mg daily
 $kernel emotion anxious 6, hopeful 4
 $kernel context add rx "medication rows should include dose and frequency"
+$kernel queue move "^follow_up_.*$" experience
+$kernel experience strip archived_
 $kernel push
 ```
 
@@ -75,9 +77,34 @@ These generic commands are available for kernels that support the operation:
 - `$kernel <kernel> add ...`: queue a row add mutation.
 - `$kernel <kernel> update ...`: queue a row update mutation.
 - `$kernel <kernel> delete ...`: queue a row remove mutation.
+- `$kernel <kernel> move <selector-regex> <destination-kernel>`: queue one native move mutation selecting source rows by `name` regex and moving all matches to another registered kernel.
+- `$kernel <kernel> strip <prefix>`: queue exact-name update mutations that remove a literal prefix from every matching committed row name.
 - `$kernel <kernel> data`: read committed rows from the generated pack.
 - `$kernel <kernel> names`: list committed row names from the cached manifest.
 - `$kernel <kernel> view <name>`: render one committed row as Markdown.
+
+## Native Mutation Schema
+
+Mutation files contain exactly `action`, `selector`, and `json`.
+
+`add`, `remove`, and `update` retain their existing behavior. Native `move` uses the same regex selector contract as `remove` and `update`:
+
+```json
+{
+  "action": "move",
+  "selector": {
+    "field": "name",
+    "regex": "^follow_up_.*$"
+  },
+  "json": {
+    "kernel": "experience"
+  }
+}
+```
+
+A move is processed as one mutation: every matching source row is removed from the source kernel and appended unchanged to the destination kernel. The processor rejects an unregistered destination, moving to the same kernel, zero matches, and destination name collisions. Source and destination indexes, packs, row files, and `kernel-state.json` are regenerated in the same processor run.
+
+`strip` is implemented as deterministic update mutations rather than direct row rewrites. This keeps prefix renaming inside the same mutation pipeline and preserves atomic push behavior.
 
 ## Registered Kernels
 
