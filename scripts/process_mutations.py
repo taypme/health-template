@@ -16,7 +16,7 @@ STATE_PATH = ROOT / "kernel-state.json"
 KERNELS_ROOT = ROOT / "kernels"
 MUTATIONS_ROOT = ROOT / "mutations"
 EXPECTED_KEYS = {"action", "selector", "json"}
-ALLOWED_ACTIONS = {"add", "remove", "update"}
+ALLOWED_ACTIONS = {"add", "move", "remove", "update"}
 MAX_FILENAME_BYTES = 240
 
 
@@ -39,7 +39,6 @@ class MutationError(RuntimeError):
 def load_json(path: Path) -> Any:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
-        # Repair historical rows accidentally stored as a JSON string containing JSON.
         if isinstance(value, str):
             value = json.loads(value)
         return value
@@ -142,6 +141,18 @@ def validate_selector(value: Any, path: Path) -> tuple[str, re.Pattern[str]]:
         raise MutationError(f"Invalid regex in {path.relative_to(ROOT)}: {exc}") from exc
 
 
+def move_destination(mutation: dict[str, Any], path: Path) -> str:
+    payload = mutation.get("json")
+    if not isinstance(payload, dict) or set(payload) != {"kernel"}:
+        raise MutationError(
+            f"Move json must contain exactly kernel in {path.relative_to(ROOT)}"
+        )
+    destination = payload.get("kernel")
+    if not isinstance(destination, str) or not destination:
+        raise MutationError(f"Invalid move destination in {path.relative_to(ROOT)}")
+    return destination
+
+
 def validate_mutation(path: Path) -> dict[str, Any]:
     mutation = load_json(path)
     if not isinstance(mutation, dict) or set(mutation) != EXPECTED_KEYS:
@@ -151,7 +162,7 @@ def validate_mutation(path: Path) -> dict[str, Any]:
     action = mutation.get("action")
     if action not in ALLOWED_ACTIONS:
         raise MutationError(
-            f"{path.relative_to(ROOT)} action must be add, remove, or update"
+            f"{path.relative_to(ROOT)} action must be add, move, remove, or update"
         )
     selector, payload = mutation.get("selector"), mutation.get("json")
     if action == "add":
@@ -160,9 +171,10 @@ def validate_mutation(path: Path) -> dict[str, Any]:
     elif action == "remove":
         validate_selector(selector, path)
         if payload is not None:
-            raise MutationError(
-                f"Remove json must be null in {path.relative_to(ROOT)}"
-            )
+            raise MutationError(f"Remove json must be null in {path.relative_to(ROOT)}")
+    elif action == "move":
+        validate_selector(selector, path)
+        move_destination(mutation, path)
     else:
         validate_selector(selector, path)
         if not isinstance(payload, dict) or not payload:
@@ -193,40 +205,75 @@ def selector_candidates(field: str, value: Any) -> list[str]:
 def matches(row: dict[str, Any], field: str, pattern: re.Pattern[str]) -> bool:
     if field not in row:
         return False
-    return any(pattern.search(candidate) is not None for candidate in selector_candidates(field, row[field]))
+    return any(
+        pattern.search(candidate) is not None
+        for candidate in selector_candidates(field, row[field])
+    )
 
 
 def apply_mutation(
-    rows: list[dict[str, Any]],
+    source_kernel: str,
+    rows_by_kernel: dict[str, list[dict[str, Any]]],
     mutation: dict[str, Any],
     path: Path,
-) -> list[dict[str, Any]]:
+    registry: dict[str, dict[str, Path]],
+) -> None:
+    rows = rows_by_kernel[source_kernel]
     action, payload = mutation["action"], mutation["json"]
     if action == "add":
         rows.append(dict(payload))
-        return rows
+        return
 
     field, pattern = validate_selector(mutation["selector"], path)
-    matched = 0
-    if action == "remove":
-        kept = []
-        for row in rows:
-            if matches(row, field, pattern):
-                matched += 1
-            else:
-                kept.append(row)
-        rows = kept
-    else:
-        for row in rows:
-            if matches(row, field, pattern):
-                row.update(payload)
-                matched += 1
-
-    if matched == 0:
+    matched_rows = [row for row in rows if matches(row, field, pattern)]
+    if not matched_rows:
         raise MutationError(
             f"{path.relative_to(ROOT)} matched zero rows using {field} /{pattern.pattern}/"
         )
-    return rows
+
+    if action == "remove":
+        rows_by_kernel[source_kernel] = [
+            row for row in rows if not matches(row, field, pattern)
+        ]
+        return
+
+    if action == "update":
+        for row in matched_rows:
+            row.update(payload)
+        return
+
+    destination = move_destination(mutation, path)
+    if destination not in registry:
+        raise MutationError(
+            f"{path.relative_to(ROOT)} targets unknown kernel {destination}"
+        )
+    if destination == source_kernel:
+        raise MutationError(
+            f"{path.relative_to(ROOT)} move destination must differ from source kernel"
+        )
+
+    destination_rows = rows_by_kernel[destination]
+    destination_names = {
+        str(row.get("name"))
+        for row in destination_rows
+        if row.get("name") is not None
+    }
+    moved_names = {
+        str(row.get("name"))
+        for row in matched_rows
+        if row.get("name") is not None
+    }
+    collisions = sorted(destination_names & moved_names)
+    if collisions:
+        raise MutationError(
+            f"{path.relative_to(ROOT)} move would collide with destination row name(s): "
+            + ", ".join(collisions)
+        )
+
+    rows_by_kernel[source_kernel] = [
+        row for row in rows if not matches(row, field, pattern)
+    ]
+    destination_rows.extend(dict(row) for row in matched_rows)
 
 
 def write_kernel(
@@ -374,6 +421,7 @@ def event_changed_paths() -> set[str]:
 def affected_kernels(
     registry: dict[str, dict[str, Path]],
     grouped: dict[str, list[Path]],
+    validated: dict[Path, dict[str, Any]],
 ) -> tuple[set[str], bool]:
     affected = set(grouped)
     changed = event_changed_paths()
@@ -381,6 +429,13 @@ def affected_kernels(
 
     if "kernel.json" in changed or "scripts/process_mutations.py" in changed:
         force_all = True
+
+    for mutation in validated.values():
+        if mutation["action"] == "move":
+            destination = mutation["json"]["kernel"]
+            if destination not in registry:
+                raise MutationError(f"Move targets unknown kernel {destination}")
+            affected.add(destination)
 
     for path in changed:
         match = re.fullmatch(r"kernels/([^/]+)/data/(?:.+\.json|data\.jsonl)", path)
@@ -412,20 +467,31 @@ def main() -> int:
         validated[path] = validate_mutation(path)
         grouped.setdefault(kernel, []).append(path)
 
-    affected, force_all = affected_kernels(registry, grouped)
+    affected, force_all = affected_kernels(registry, grouped, validated)
+    rows_by_kernel = {
+        kernel: load_rows(paths["data_dir"])
+        for kernel, paths in registry.items()
+        if kernel in affected
+    }
+
+    for path in files:
+        source_kernel = path.parent.name
+        apply_mutation(
+            source_kernel,
+            rows_by_kernel,
+            validated[path],
+            path,
+            registry,
+        )
 
     for kernel, paths in registry.items():
         if kernel not in affected:
             continue
-
-        rows = load_rows(paths["data_dir"])
-        for path in sorted(grouped.get(kernel, [])):
-            rows = apply_mutation(rows, validated[path], path)
-
+        rows = rows_by_kernel[kernel]
         write_kernel(kernel, paths, rows)
         print(
             f"Indexed and packed {len(rows)} row(s) for {kernel}; "
-            f"processed {len(grouped.get(kernel, []))} mutation(s)."
+            f"processed {len(grouped.get(kernel, []))} source mutation(s)."
         )
 
     write_state(registry)
