@@ -4,6 +4,13 @@ Health Kernel is a GitHub-backed personal data kernel for ChatGPT conversations.
 
 This repository is the vanilla template. It contains the kernel system, commands, mutation processor, and GitHub Actions workflow, but no personal health data.
 
+## Important distinction
+
+`README.md` is onboarding for people. [`INSTRUCTIONS.md`](./INSTRUCTIONS.md)
+is the authoritative operating contract for an AI client. If this README and
+the contract ever differ, follow the contract and inspect the current
+`kernel.json`.
+
 ## How It Works
 
 - `INSTRUCTIONS.md` is the complete machine-readable operating contract for ChatGPT.
@@ -154,3 +161,9 @@ GITHUB_EVENT_NAME=workflow_dispatch python3 scripts/process_mutations.py
 ```
 
 All committed kernel data should be regenerated through the processor or through the documented kernel commands. Treat `index.json`, `pack.json`, and `kernel-state.json` as generated artifacts.
+
+## Before publishing a derived repository
+
+Confirm that the new repository is private, contains no personal data in the
+template, has Actions enabled, and uses `main`. Replace the placeholder owner
+and repository in the hydration prompt before sharing it with ChatGPT.
