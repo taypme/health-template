@@ -180,7 +180,7 @@ These kernels can mirror and create Trello content when ChatGPT has access to th
 
 - `$kernel board <name>`: uses normal kernel add fallback semantics to queue a board row. When using Trello, resolve and store the stable Trello board ID.
 - `$kernel board names`: show each committed board and its external lists in a compact `board` / `list` table.
-- `$kernel board pull`: read all lists and cards for committed board rows through Trello and queue only cards not already represented by their stable `card_id`. Pull imports existing Trello cards; it does **not** recreate them remotely.
+- `$kernel board pull [board]`: read lists and cards through Trello and queue only cards not already represented by their stable `card_id`. With no argument, pull every committed board row; when `board` is supplied, pull only that exact committed board. Pull imports existing Trello cards; it does **not** recreate them remotely.
 - `$kernel card add <board> <list> <card> <description>`: create one Trello card exactly once, creating the list first only when needed, capture the returned board/list/card IDs, generate a random UUID for the kernel row name, then queue the complete card row. Stable IDs are checked before creation to prevent duplicates.
 - `$kernel card data`: show committed cards in a compact table with `list`, `card`, and `description` columns.
 
