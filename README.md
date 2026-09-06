@@ -133,6 +133,8 @@ regret
 like
 am
 think
+board
+card
 ```
 
 You can keep these, delete the ones you do not want, or create new kernels with `$kernel kernel create <name>`.
@@ -151,6 +153,38 @@ You can keep these, delete the ones you do not want, or create new kernels with 
 - `$kernel like add <name> <intensity>`: add a like row.
 - `$kernel am add <name> <intensity>`: add an AM row.
 - `$kernel think <text>`: add the provided text as a timestamped thought row.
+
+## Trello Board And Card Integration
+
+The template ships with empty `board` and `card` kernels. They are implemented through `kernel.json` and the normal kernel mutation system; they are not special-cased in `INSTRUCTIONS.md`.
+
+These kernels can mirror and create Trello content when ChatGPT has access to the **Trello connector**. The connector is optional for the rest of Health Kernel, but it is required for commands that need to read from or write to Trello. Without a Trello connector, the board/card schemas still exist, but external board operations cannot be completed.
+
+### Board schema
+
+- `name`: kernel name for the board.
+- `board_id`: stable Trello board identifier when available.
+
+### Card schema
+
+- `board`: board kernel row name.
+- `board_id`: stable external board identifier.
+- `list`: Trello list name.
+- `list_id`: stable external list identifier.
+- `name`: random UUID used as the kernel row name.
+- `card`: card title.
+- `card_id`: stable external card identifier and primary deduplication key.
+- `description`: card description.
+
+### Commands
+
+- `$kernel board <name>`: uses normal kernel add fallback semantics to queue a board row. When using Trello, resolve and store the stable Trello board ID.
+- `$kernel board names`: show each committed board and its external lists in a compact `board` / `list` table.
+- `$kernel board pull`: read all lists and cards for committed board rows through Trello and queue only cards not already represented by their stable `card_id`. Pull imports existing Trello cards; it does **not** recreate them remotely.
+- `$kernel card add <board> <list> <card> <description>`: create one Trello card exactly once, creating the list first only when needed, capture the returned board/list/card IDs, generate a random UUID for the kernel row name, then queue the complete card row. Stable IDs are checked before creation to prevent duplicates.
+- `$kernel card data`: show committed cards in a compact table with `list`, `card`, and `description` columns.
+
+The external IDs are important. `card_id` is the primary deduplication key, and the kernel must never invent Trello IDs or recreate a card merely because kernel persistence failed after Trello creation succeeded.
 
 ## Local Maintenance
 
