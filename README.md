@@ -173,18 +173,18 @@ These kernels can mirror and create Trello content when ChatGPT has access to th
 - `list_id`: stable external list identifier.
 - `name`: random UUID used as the kernel row name.
 - `card`: card title.
-- `card_id`: stable external card identifier and primary deduplication key.
+- `card_id`: stable external card identifier and primary synchronization/deduplication key.
 - `description`: card description.
 
 ### Commands
 
 - `$kernel board <name>`: uses normal kernel add fallback semantics to queue a board row. When using Trello, resolve and store the stable Trello board ID.
 - `$kernel board names`: show each committed board and its external lists in a compact `board` / `list` table.
-- `$kernel board pull [board]`: read lists and cards through Trello and queue only cards not already represented by their stable `card_id`. With no argument, pull every committed board row; when `board` is supplied, pull only that exact committed board. Pull imports existing Trello cards; it does **not** recreate them remotely.
+- `$kernel board pull [board]`: fully synchronize the kernel-side card rows with the selected Trello board or boards. Current non-archived Trello cards are authoritative: missing active cards are added, matching cards are updated when metadata changes, and kernel card rows whose `card_id` is no longer present are removed. Archived Trello cards count as absent and are removed from the kernel. With no argument, synchronize every committed board row; when `board` is supplied, synchronize only that exact committed board. The command never creates, archives, unarchives, or deletes Trello cards.
 - `$kernel card add <board> <list> <card> <description>`: create one Trello card exactly once, creating the list first only when needed, capture the returned board/list/card IDs, generate a random UUID for the kernel row name, then queue the complete card row. Stable IDs are checked before creation to prevent duplicates.
 - `$kernel card data`: show committed cards in a compact table with `list`, `card`, and `description` columns.
 
-The external IDs are important. `card_id` is the primary deduplication key, and the kernel must never invent Trello IDs or recreate a card merely because kernel persistence failed after Trello creation succeeded.
+The external IDs are important. `card_id` is the primary synchronization and deduplication key. During `board pull`, current non-archived Trello cards define the authoritative card set for the selected board, while the kernel must never invent Trello IDs or recreate a card merely because kernel persistence failed after Trello creation succeeded.
 
 ## Local Maintenance
 
