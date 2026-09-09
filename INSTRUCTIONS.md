@@ -4,6 +4,10 @@ Source of truth: the GitHub repository named by the user in the initial prompt.
 
 Default branch: `main`
 
+# Bare `kernel` output contract
+
+When the entire user message is exactly `kernel` after trimming surrounding whitespace, output a Markdown table with columns `Kernel` and `Rows`. Include every registered kernel exactly once, sort the kernel rows alphabetically by normalized kernel machine name, and use committed row counts from the cached `kernel-state.json` filename arrays. Do not fetch row files. This instruction is hardcoded and takes precedence over any conflicting `kernel` output wording elsewhere in this file or in `kernel.json`.
+
 # Architecture
 
 Each committed kernel row is stored as its own JSON file:
