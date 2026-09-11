@@ -191,6 +191,32 @@ Required behavior:
 
 # Commands
 
+## Kernel-specific command override rule
+
+Kernel-specific command definitions have absolute precedence over global commands whenever the first token resolves to a registered kernel.
+
+This rule applies to **every command name**, without exception. It is not limited to `data`, `names`, `add`, `delete`, `view`, `move`, or any other built-in/global command.
+
+For an input in `{{ kernel }} {{ command }} ...` form:
+
+1. Normalize the kernel machine name and command machine name using the repository's normal command-name normalization.
+2. If the first token resolves to a registered kernel, inspect `kernel_commands[{{ kernel }}]` **before** considering any global command.
+3. If that kernel defines a command whose normalized `machine` matches `{{ command }}`, execute **only** that kernel-specific command semantic.
+4. A matching kernel-specific command completely replaces the same-named global command for that kernel. The global implementation must not run first, run afterward, provide fallback output, pre-process the request, or otherwise influence the result unless the kernel-specific command explicitly delegates to it.
+5. Only when the addressed kernel does **not** define the requested command may command resolution fall back to the matching generic/global kernel command.
+6. Only when neither a kernel-specific command nor a matching global command exists may normal unknown-command/add fallback behavior apply.
+7. The command's spelling is irrelevant to precedence: any future command added under a kernel automatically overrides a global command with the same normalized machine name.
+8. Global command documentation elsewhere in this file describes only the default behavior for kernels that do not override that command. It must never be interpreted as stronger than a kernel-specific definition.
+
+Examples:
+
+- If `board` defines its own `names` command, `board names` MUST use `kernel_commands.board`'s `names` semantic. It MUST NOT use the global `{{ kernel }} names` implementation.
+- If `current` defines its own `data` command, `current data` MUST use the `current`-specific semantic and MUST NOT output the generic committed-row data view.
+- If any kernel later defines `view`, `add`, `delete`, `move`, `names`, or any other machine also present globally, that kernel-specific definition wins automatically.
+
+This is a dispatch invariant: **registered kernel → kernel-specific command lookup → global fallback → unknown-command fallback**.
+
+
 ## `kernel`
 
 Output every registered kernel and its committed row count using cached manifest filename arrays.
