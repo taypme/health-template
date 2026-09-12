@@ -274,6 +274,10 @@
     ],
     "board": [
       {
+        "machine": "add",
+        "semantic": "Arguments: 1 board. Interpret argument 1 as the human-readable external Trello board name, never as a board_id, Trello ARI, URL, short link, or other identifier. `board <board>` is shorthand for `board add <board>` and MUST execute this same semantic through the normal unknown-command/add fallback. Resolve the supplied board name through the Trello connector against boards accessible to the authenticated user. Match by human-readable board name; if exactly one board matches, capture its stable external board ARI/id from Trello and queue one complete board add row with name set to the normalized lowercase kernel row name derived from the supplied board name and board_id set to the exact stable identifier returned by Trello. Do not create an external Trello board. Do not synthesize board_id. If no board matches, or the supplied name is ambiguous across multiple accessible boards, report a concise error and queue nothing. Before queueing, reject a duplicate when the same committed or pending board row name or stable board_id already exists."
+      },
+      {
         "machine": "names",
         "semantic": "List out all board kernel row names, and lists of every board kernel row, in a compact table with board and list columns."
       },
