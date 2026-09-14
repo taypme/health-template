@@ -182,8 +182,8 @@ Required behavior:
 2. Build one Git tree containing the complete batch.
 3. Create exactly one mutation push commit from that tree.
 4. Advance `main` exactly once for the batch.
-5. Never create one commit per mutation file.
-6. Never use sequential GitHub Contents API writes to materialize a mutation batch.
+5. Prefer one atomic commit for the complete mutation batch.
+6. If atomic Git primitives are unavailable, rejected, or impractical, GitHub Contents API writes such as `create_file` and `update_file` are allowed as a fallback; verify every resulting mutation path and commit.
 7. If the complete batch cannot be committed atomically, write none of it and retain every pending mutation.
 8. Clear a local mutation only after the single mutation push commit is confirmed to contain its exact path and content.
 9. If `main` advances, rebuild from the new tip and retry rather than forcing the ref.
@@ -379,7 +379,7 @@ The workflow must tolerate `main` advancing after checkout by retrying against t
 
 Prefer authenticated GitHub CLI plus local `git` when the active runtime actually exposes them and higher-priority instructions allow their use. Otherwise use the available authenticated GitHub connector actions.
 
-For atomic mutation pushes, use Git tree/blob/commit/ref primitives through the best available authorized mechanism. Never degrade to sequential per-file mutation commits.
+For mutation pushes, prefer Git tree/blob/commit/ref primitives through the best available authorized mechanism. GitHub Contents API `create_file`/`update_file` writes are allowed as a fallback when the atomic path is unavailable or rejected.
 
 Do not claim a capability is available merely because this repository requests it; inspect the active runtime.
 
