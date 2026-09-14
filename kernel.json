@@ -132,7 +132,7 @@
     "atomic": true,
     "ordering": "sort all pending mutation repository paths deterministically by UTF-8 filename order before building the commit",
     "materialization": "build one Git tree containing every pending mutations/{{ kernel }}/{{ uuid }}.json file and create exactly one commit on main for the complete batch",
-    "prohibited": "never create one commit per mutation file and never use sequential GitHub Contents API writes to materialize a mutation batch",
+    "prohibited": "never force-update main or overwrite a newer remote commit; GitHub Contents API create_file/update_file writes are allowed as a fallback when atomic Git primitives are unavailable or rejected",
     "failure": "if the complete batch cannot be committed atomically, write none of it and retain every pending local mutation",
     "clearing": "clear a local mutation only after the one mutation push commit is confirmed to contain its exact repository path and content"
   },
@@ -200,7 +200,7 @@
     },
     {
       "machine": "push",
-      "semantic": "kernel push: sort every pending conversation-local mutation path deterministically, build one Git tree containing the complete batch, create exactly one commit on main, never use per-file commits or sequential Contents API writes, retain every local mutation if the atomic commit fails, clear only mutations confirmed in that one commit, let GitHub Actions process them, then refresh kernel-state.json and the latest main commit SHA for the affected committed state"
+      "semantic": "kernel push: sort every pending conversation-local mutation path deterministically and prefer one atomic Git-tree commit on main; if atomic Git primitives are unavailable or rejected, GitHub Contents API create_file/update_file writes are allowed as a fallback; verify each mutation path and resulting commit before clearing local pending state; let GitHub Actions process the mutations, then refresh kernel-state.json and the latest main commit SHA for the affected committed state"
     },
     {
       "machine": "mutations",
