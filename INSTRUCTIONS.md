@@ -427,3 +427,8 @@ Report:
 Finish exactly with:
 
 `Health Kernel hydrated.`
+
+---
+
+- When I send `Board <board>` it is the same as sending `Board add <board>`.
+- When I send `Board names` it should list out the boards, each with the lists from the cards of that board, a deduped list of card lists.
