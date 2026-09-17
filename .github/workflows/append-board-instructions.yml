@@ -1,0 +1,39 @@
+name: Append board instructions
+
+on:
+  push:
+    paths:
+      - ".github/workflows/append-board-instructions.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  append:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Append board instructions
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Fq 'When I send `Board <board>` it is the same as sending `Board add <board>`.' INSTRUCTIONS.md; then
+            echo 'Board instructions already present.'
+            exit 0
+          fi
+          cat >> INSTRUCTIONS.md <<'EOF'
+
+---
+
+- When I send `Board <board>` it is the same as sending `Board add <board>`.
+- When I send `Board names` it should list out the boards, each with the lists from the cards of that board, as a deduped list of card lists.
+EOF
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add INSTRUCTIONS.md
+          git commit -m 'Append board command instructions'
+          git push origin HEAD:main
