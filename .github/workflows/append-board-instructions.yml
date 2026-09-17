@@ -25,13 +25,7 @@ jobs:
             echo 'Board instructions already present.'
             exit 0
           fi
-          cat >> INSTRUCTIONS.md <<'EOF'
-
----
-
-- When I send `Board <board>` it is the same as sending `Board add <board>`.
-- When I send `Board names` it should list out the boards, each with the lists from the cards of that board, as a deduped list of card lists.
-EOF
+          printf '%s\n' '' '---' '' '- When I send `Board <board>` it is the same as sending `Board add <board>`.' '- When I send `Board names` it should list out the boards, each with the lists from the cards of that board, a deduped list of card lists.' >> INSTRUCTIONS.md
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add INSTRUCTIONS.md
